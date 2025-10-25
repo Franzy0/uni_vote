@@ -1,0 +1,80 @@
+<?php
+// app/controllers/AdminController.php
+namespace App\Controllers;
+use App\Models\CandidateModel;
+use App\Models\VoteModel;
+use App\Core\Utils;
+use TCPDF;
+defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
+
+class AdminController {
+    protected $candidateModel;
+    protected $voteModel;
+    public function __construct() {
+        $this->candidateModel = new CandidateModel();
+        $this->voteModel = new VoteModel();
+        Utils::startSession();
+        if (!isset($_SESSION['admin'])) {
+            header("Location: /");
+            exit;
+        }
+    }
+
+    public function dashboard() {
+        $tally = $this->candidateModel->tally();
+        include __DIR__ . '/../views/admin/dashboard.php';
+    }
+
+    public function candidates() {
+        $candidates = $this->candidateModel->all();
+        include __DIR__ . '/../views/admin/manage_candidates.php';
+    }
+
+    public function saveCandidate() {
+        // handle create/update
+        $id = $_POST['id'] ?? null;
+        $data = [
+            'name' => $_POST['name'] ?? '',
+            'position' => $_POST['position'] ?? '',
+            'course' => $_POST['course'] ?? '',
+            'manifesto' => $_POST['manifesto'] ?? '',
+            'photo' => null
+        ];
+        if ($id) {
+            $this->candidateModel->update($id, $data);
+        } else {
+            $this->candidateModel->create($data);
+        }
+        header("Location: /admin/candidates");
+    }
+
+    public function deleteCandidate() {
+        $id = $_POST['id'] ?? null;
+        if ($id) $this->candidateModel->delete($id);
+        header("Location: /admin/candidates");
+    }
+
+    public function exportResults() {
+        $format = $_GET['format'] ?? 'csv';
+        $rows = $this->candidateModel->tally();
+        if ($format === 'csv') {
+            header('Content-Type: text/csv');
+            header('Content-Disposition: attachment; filename="results.csv"');
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Candidate', 'Position', 'Votes']);
+            foreach ($rows as $r) fputcsv($out, [$r['name'], $r['position'], $r['votes']]);
+            fclose($out);
+            exit;
+        } else if ($format === 'pdf') {
+            // Using TCPDF - simple export
+            $pdf = new TCPDF();
+            $pdf->AddPage();
+            $html = '<h1>Election Results</h1><table border="1" cellpadding="4"><tr><th>Candidate</th><th>Position</th><th>Votes</th></tr>';
+            foreach ($rows as $r) $html .= "<tr><td>{$r['name']}</td><td>{$r['position']}</td><td>{$r['votes']}</td></tr>";
+            $html .= '</table>';
+            $pdf->writeHTML($html);
+            $pdf->Output('results.pdf', 'D');
+            exit;
+        }
+    }
+}
