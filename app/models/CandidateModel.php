@@ -5,61 +5,26 @@ class CandidateModel extends Model
 {
     protected $table = 'candidates';
     protected $primary_key = 'id';
-    protected $allowed_fields = ['name', 'position', 'party'];
+    protected $allowed_fields = ['name', 'position', 'party', 'year_level', 'created_at'];
 
-    public function __construct()
+    public function getAllCandidates()
     {
-        parent::__construct();
+        return $this->db->table($this->table)->order_by('position', 'ASC')->get_all();
     }
 
-    // Get all candidates ordered by position
-    public function get_all()
+    public function getCandidateById($id)
     {
-        return $this->db->table($this->table)
-                        ->order_by('position', 'ASC')
-                        ->get_all();
+        return $this->db->table($this->table)->where('id', $id)->get();
     }
 
-    // Override find() with correct signature
-    public function find($id, $with_deleted = false)
+    public function addCandidate($data)
     {
-        return $this->db->table($this->table)
-                        ->where('id', $id)
-                        ->get();
+        $data['created_at'] = date('Y-m-d H:i:s');
+        return $this->db->table($this->table)->insert($data);
     }
 
-    // Create a new candidate
-    public function create($data)
+    public function deleteCandidate($id)
     {
-        return $this->db->table($this->table)
-                        ->insert($data);
-    }
-
-    // Update candidate
-    public function update_candidate($id, $data)
-    {
-        return $this->db->table($this->table)
-                        ->where('id', $id)
-                        ->update($data);
-    }
-
-    // Delete candidate
-    public function delete_candidate($id)
-    {
-        return $this->db->table($this->table)
-                        ->where('id', $id)
-                        ->delete();
-    }
-
-    // Count total votes per candidate
-    public function tally()
-    {
-        $sql = "SELECT c.id, c.name, c.position, COUNT(v.id) AS votes
-                FROM candidates c
-                LEFT JOIN votes v ON c.id = v.candidate_id
-                GROUP BY c.id, c.name, c.position
-                ORDER BY votes DESC";
-
-        return $this->db->raw($sql);
+        return $this->db->table($this->table)->where('id', $id)->delete();
     }
 }

@@ -42,19 +42,23 @@ defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 |
 |
 */
+$router->get('/', 'AuthController::login');
 
-$router->get('/', 'VoteController::index');
-$router->match('/vote', 'VoteController::vote', ['GET','POST']);
-$router->get('/vote/success', 'VoteController::success');
-
-// Auth
-$router->match('/auth/login', 'AuthController::login', ['GET','POST']);
-$router->match('/auth/register', 'AuthController::register', ['GET','POST']);
+# Authentication routes
+$router->match('/auth/login', 'AuthController::login', ['GET', 'POST']);
+$router->match('/auth/register', 'AuthController::register', ['GET', 'POST']);
 $router->get('/auth/logout', 'AuthController::logout');
 
-// Admin
-$router->get('/admin', 'AdminController::dashboard');
-$router->match('/admin/candidates', 'AdminController::manage_candidates', ['GET','POST']);
-$router->post('/admin/candidates/delete', 'AdminController::delete_candidate');
+# Voter routes
+$router->get('/vote', 'VoteController::index');
+$router->post('/vote/submit', 'VoteController::submitVote');
+$router->get('/vote/confirmation', 'VoteController::confirmation');
+
+# Admin routes
+$router->match('/admin/login', 'AuthController::adminLogin', ['GET', 'POST']);
+$router->get('/admin/dashboard', 'AdminController::dashboard');
+$router->match('/admin/candidates', 'AdminController::manageCandidates', ['GET', 'POST']);
+$router->get('/admin/delete/(:num)', 'AdminController::deleteCandidate/$1');
 $router->get('/admin/results', 'AdminController::results');
-$router->get('/admin/results/export', 'AdminController::export_results');
+$router->get('/admin/export/csv', 'AdminController::exportCSV');
+$router->get('/admin/export/pdf', 'AdminController::exportPDF');

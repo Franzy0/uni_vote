@@ -1,14 +1,31 @@
-<?php defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed'); include __DIR__ . '/../layout/header.php'; ?>
-<h3>Election Results</h3>
-<a class="btn btn-outline-success mb-3" href="/admin/results/export?format=csv">Export CSV</a>
-<a class="btn btn-outline-success mb-3" href="/admin/results/export?format=pdf">Export PDF</a>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Election Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white">
+<div class="container mt-5">
+    <h2 class="text-success">📊 Election Results</h2>
+    <canvas id="voteChart" height="150"></canvas>
+    <a href="/admin/export_csv" class="btn btn-outline-light mt-4">Export CSV</a>
+    <a href="/admin/dashboard" class="btn btn-outline-light mt-4">Back</a>
+</div>
 
-<table class="table table-bordered">
-<thead><tr><th>Candidate</th><th>Position</th><th>Votes</th></tr></thead>
-<tbody>
-<?php foreach($tally as $r): ?>
-  <tr><td><?= htmlspecialchars($r['name']) ?></td><td><?= htmlspecialchars($r['position']) ?></td><td><?= (int)$r['votes'] ?></td></tr>
-<?php endforeach; ?>
-</tbody>
-</table>
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+<script>
+const ctx = document.getElementById('voteChart').getContext('2d');
+const chartData = {
+    labels: <?= json_encode(array_column($results, 'name')) ?>,
+    datasets: [{
+        label: 'Total Votes',
+        data: <?= json_encode(array_column($results, 'total_votes')) ?>,
+        backgroundColor: 'rgba(29, 185, 84, 0.8)',
+        borderColor: '#1DB954',
+        borderWidth: 1
+    }]
+};
+new Chart(ctx, { type: 'bar', data: chartData });
+</script>
+</body>
+</html>

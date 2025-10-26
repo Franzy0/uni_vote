@@ -1,25 +1,26 @@
-<?php defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed'); include __DIR__ . '/../layout/header.php'; ?>
-<h3>Admin Dashboard</h3>
-<p>
-  <a class="btn btn-primary" href="/admin/candidates">Manage Candidates</a>
-  <a class="btn btn-outline-primary" href="/admin/results">View Results</a>
-  <a class="btn btn-outline-success" href="/admin/results/export?format=csv">Export CSV</a>
-  <a class="btn btn-outline-success" href="/admin/results/export?format=pdf">Export PDF</a>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white">
+<div class="container mt-5">
+    <h2 class="text-success mb-4">🎓 Admin Dashboard</h2>
+    <a href="/admin/candidates" class="btn btn-outline-light">Manage Candidates</a>
+    <a href="/admin/results" class="btn btn-outline-light">View Results</a>
+    <a href="/auth/logout" class="btn btn-danger float-end">Logout</a>
 
-<?php if(!empty($tally)): ?>
-  <canvas id="adminChart" height="120"></canvas>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script>
-    const labels = <?= json_encode(array_map(fn($r)=> $r['name']." (".$r['position'].")", $tally)) ?>;
-    const data = <?= json_encode(array_map(fn($r)=> (int)$r['votes'], $tally)) ?>;
-    new Chart(document.getElementById('adminChart'), {
-      type: 'pie',
-      data: { labels, datasets: [{ data }] }
-    });
-  </script>
-<?php else: ?>
-  <p>No candidates yet.</p>
-<?php endif; ?>
+    <hr class="border-light">
+    <h5>Total Votes: <?= $total_votes ?></h5>
 
-<?php include __DIR__ . '/../layout/footer.php'; ?>
+    <ul class="list-group mt-4">
+        <?php foreach ($results as $r): ?>
+            <li class="list-group-item bg-secondary text-white">
+                <?= $r['name'] ?> (<?= $r['position'] ?>) — <b><?= $r['total_votes'] ?> votes</b>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+</body>
+</html>
