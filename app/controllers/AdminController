@@ -1,62 +1,70 @@
 <?php
-// app/controllers/AdminController.php
-namespace App\Controllers;
-use App\Models\CandidateModel;
-use App\Models\VoteModel;
-use App\Core\Utils;
-use TCPDF;
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 
-class AdminController {
-    protected $candidateModel;
-    protected $voteModel;
-    public function __construct() {
-        $this->candidateModel = new CandidateModel();
-        $this->voteModel = new VoteModel();
+use \TCPDF;
+
+class AdminController extends Controller
+{
+    public function __construct()
+    {
+        parent::__construct();
+        $this->call->model('CandidateModel');
+        $this->call->model('VoteModel');
+        $this->call->model('VoterModel');
         Utils::startSession();
-        if (!isset($_SESSION['admin'])) {
-            header("Location: /");
-            exit;
+
+        // Make sure admin auth is implemented (you can use session 'admin')
+        if (empty($_SESSION['admin'])) {
+            // redirect to login page or admin login - here we redirect to auth login
+            redirect('/auth/login');
         }
     }
 
-    public function dashboard() {
-        $tally = $this->candidateModel->tally();
-        include __DIR__ . '/../views/admin/dashboard.php';
+    public function dashboard()
+    {
+        $tally = $this->CandidateModel->tally();
+        $this->call->view('admin/admin_dashboard', ['tally' => $tally]);
     }
 
-    public function candidates() {
-        $candidates = $this->candidateModel->all();
-        include __DIR__ . '/../views/admin/manage_candidates.php';
-    }
-
-    public function saveCandidate() {
-        // handle create/update
-        $id = $_POST['id'] ?? null;
-        $data = [
-            'name' => $_POST['name'] ?? '',
-            'position' => $_POST['position'] ?? '',
-            'course' => $_POST['course'] ?? '',
-            'manifesto' => $_POST['manifesto'] ?? '',
-            'photo' => null
-        ];
-        if ($id) {
-            $this->candidateModel->update($id, $data);
-        } else {
-            $this->candidateModel->create($data);
+    public function manage_candidates()
+    {
+        if ($this->form_validation->submitted()) {
+            $data = [
+                'name' => $this->io->post('name'),
+                'position' => $this->io->post('position'),
+                'course' => $this->io->post('course'),
+                'manifesto' => $this->io->post('manifesto')
+            ];
+            $this->CandidateModel->create($data);
+            Utils::flash('success', 'Candidate added.');
+            redirect('/admin/candidates');
         }
-        header("Location: /admin/candidates");
+        $candidates = $this->CandidateModel->all();
+        $this->call->view('admin/manage_candidates', ['candidates' => $candidates]);
     }
 
-    public function deleteCandidate() {
-        $id = $_POST['id'] ?? null;
-        if ($id) $this->candidateModel->delete($id);
-        header("Location: /admin/candidates");
+    public function delete_candidate()
+    {
+        if ($this->form_validation->submitted()) {
+            $id = (int)$this->io->post('id');
+            $this->CandidateModel->delete($id);
+            Utils::flash('success', 'Candidate deleted.');
+        }
+        redirect('/admin/candidates');
     }
 
-    public function exportResults() {
-        $format = $_GET['format'] ?? 'csv';
-        $rows = $this->candidateModel->tally();
+    public function results()
+    {
+        $tally = $this->CandidateModel->tally();
+        $this->call->view('admin/results', ['tally' => $tally]);
+    }
+
+    // Export results as CSV or PDF
+    public function export_results()
+    {
+        $format = $this->io->get('format') ?? 'csv';
+        $rows = $this->CandidateModel->tally();
+
         if ($format === 'csv') {
             header('Content-Type: text/csv');
             header('Content-Disposition: attachment; filename="results.csv"');
@@ -65,16 +73,21 @@ class AdminController {
             foreach ($rows as $r) fputcsv($out, [$r['name'], $r['position'], $r['votes']]);
             fclose($out);
             exit;
-        } else if ($format === 'pdf') {
-            // Using TCPDF - simple export
+        }
+
+        if ($format === 'pdf') {
+            // generate simple PDF using TCPDF
             $pdf = new TCPDF();
             $pdf->AddPage();
-            $html = '<h1>Election Results</h1><table border="1" cellpadding="4"><tr><th>Candidate</th><th>Position</th><th>Votes</th></tr>';
-            foreach ($rows as $r) $html .= "<tr><td>{$r['name']}</td><td>{$r['position']}</td><td>{$r['votes']}</td></tr>";
+            $html = '<h2>Election Results</h2><table border="1" cellpadding="4"><tr><th>Candidate</th><th>Position</th><th>Votes</th></tr>';
+            foreach ($rows as $r) {
+                $html .= "<tr><td>{$r['name']}</td><td>{$r['position']}</td><td>{$r['votes']}</td></tr>";
+            }
             $html .= '</table>';
             $pdf->writeHTML($html);
             $pdf->Output('results.pdf', 'D');
             exit;
         }
+        redirect('/admin/results');
     }
 }

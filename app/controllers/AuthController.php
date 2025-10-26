@@ -1,134 +1,111 @@
 <?php
-// app/controllers/AuthController.php
-namespace App\Controllers;
-use App\Core\Utils;
-use App\Models\VoterModel;
-use App\Models\AdminModel;
-use PHPMailer\PHPMailer\PHPMailer;
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 
-class AuthController {
-    protected $voterModel;
-    protected $adminModel;
-    protected $cfg;
-    public function __construct() {
-        $this->voterModel = new VoterModel();
-        $this->adminModel = new AdminModel();
-        $this->cfg = require __DIR__ . '/../config/config.php';
+class AuthController extends Controller
+{
+    public function __construct()
+    {
+        parent::__construct();
+        $this->call->model('VoterModel');
         Utils::startSession();
     }
 
-    public function login() {
-        // if GET: show login view
-        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-            $csrf = Utils::generateCSRF();
-            include __DIR__ . '/../views/auth/login.php';
-            return;
-        }
-        // POST: process
-        $recaptcha = $this->verifyRecaptcha($_POST['g-recaptcha-response'] ?? '');
-        if(!$recaptcha) {
-            $_SESSION['error'] = "reCAPTCHA validation failed";
-            header("Location: /");
-            exit;
-        }
-        $type = $_POST['type'] ?? 'voter';
-        $username = trim($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
+    // GET/POST login
+    public function login()
+    {
+        $cfg = require __DIR__ . '/../config/config.php';
+        if ($this->form_validation->submitted()) {
+            $student_id = trim($this->io->post('student_id'));
+            $password = $this->io->post('password');
+            // reCAPTCHA check (skip if not configured)
+            $rec = $this->io->post('g-recaptcha-response');
+            if (!empty($cfg['recaptcha']['secret_key'])) {
+                $verify = $this->verifyRecaptcha($rec, $cfg['recaptcha']['secret_key']);
+                if (!$verify) {
+                    Utils::flash('error', 'reCAPTCHA verification failed');
+                    redirect('/auth/login');
+                }
+            }
 
-        if ($type === 'admin') {
-            $admin = $this->adminModel->authenticate($username, $password);
-            if ($admin) {
-                $_SESSION['admin'] = $admin;
-                header("Location: /admin");
+            $user = $this->VoterModel->findByStudentId($student_id);
+            if ($user && password_verify($password, $user['password'])) {
+                $_SESSION['voter'] = $user;
+                redirect('/');
             } else {
-                $_SESSION['error'] = "Invalid admin username or password";
-                header("Location: /");
+                Utils::flash('error', 'Invalid credentials.');
+                redirect('/auth/login');
             }
-            exit;
-        } else {
-            $voter = $this->voterModel->authenticate($username, $password);
-            if ($voter) {
-                $_SESSION['voter'] = $voter;
-                header("Location: /vote");
-            } else {
-                $_SESSION['error'] = "Invalid student ID or password";
-                header("Location: /");
-            }
-            exit;
         }
+
+        $csrf = Utils::generateCSRF();
+        $this->call->view('auth/login', ['csrf' => $csrf]);
     }
 
-    public function register() {
-        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-            $csrf = Utils::generateCSRF();
-            include __DIR__ . '/../views/auth/register.php';
-            return;
+    // GET/POST register
+    public function register()
+    {
+        $cfg = require __DIR__ . '/../config/config.php';
+        if ($this->form_validation->submitted()) {
+            // CSRF
+            if (!Utils::validateCSRF($this->io->post('csrf_token'))) {
+                Utils::flash('error', 'Invalid CSRF token.');
+                redirect('/auth/register');
+            }
+
+            $student_id = trim($this->io->post('student_id'));
+            $fullname = trim($this->io->post('fullname'));
+            $email = trim($this->io->post('email'));
+            $password = $this->io->post('password');
+
+            // reCAPTCHA
+            $rec = $this->io->post('g-recaptcha-response');
+            if (!empty($cfg['recaptcha']['secret_key'])) {
+                $verify = $this->verifyRecaptcha($rec, $cfg['recaptcha']['secret_key']);
+                if (!$verify) {
+                    Utils::flash('error', 'reCAPTCHA verification failed');
+                    redirect('/auth/register');
+                }
+            }
+
+            if ($this->VoterModel->findByStudentId($student_id)) {
+                Utils::flash('error', 'Student ID already registered');
+                redirect('/auth/register');
+            }
+
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $this->VoterModel->create($student_id, $fullname, $email, $hash);
+            // send email confirmation
+            if (class_exists('Mailer')) {
+                $mail = new Mailer();
+                $mail->send($email, 'Registration Successful', "Hi $fullname, your account was created.");
+            }
+
+            Utils::flash('success', 'Registration successful. Please login.');
+            redirect('/auth/login');
         }
-        // POST
-        if (!Utils::validateCSRF($_POST['csrf_token'] ?? '')) {
-            $_SESSION['error'] = "Invalid CSRF token";
-            header("Location: /register");
-            exit;
-        }
-        $recaptcha = $this->verifyRecaptcha($_POST['g-recaptcha-response'] ?? '');
-        if(!$recaptcha) {
-            $_SESSION['error'] = "reCAPTCHA validation failed";
-            header("Location: /register");
-            exit;
-        }
-        $student_id = trim($_POST['student_id']);
-        $fullname = trim($_POST['fullname']);
-        $email = trim($_POST['email']);
-        $password = $_POST['password'];
-        if ($this->voterModel->findByStudentId($student_id)) {
-            $_SESSION['error'] = "Student ID already registered";
-            header("Location: /register");
-            exit;
-        }
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        $this->voterModel->create($student_id, $fullname, $email, $hash);
-        // send confirmation email
-        $this->sendEmail($email, 'Registration Successful', "Hello $fullname, your account has been created.");
-        $_SESSION['success'] = "Registration successful. Please login.";
-        header("Location: /");
+
+        $csrf = Utils::generateCSRF();
+        $this->call->view('auth/register', ['csrf' => $csrf, 'recaptcha_site' => $cfg['recaptcha']['site_key'] ?? '']);
     }
 
-    public function logout() {
-        session_start();
+    public function logout()
+    {
+        Utils::startSession();
         session_unset();
         session_destroy();
-        header("Location: /");
+        redirect('/auth/login');
     }
 
-    protected function sendEmail($to, $subject, $body) {
-        $mail = new PHPMailer(true);
-        try {
-            $mCfg = $this->cfg['mail'];
-            $mail->isSMTP();
-            $mail->Host = $mCfg['host'];
-            $mail->SMTPAuth = true;
-            $mail->Username = $mCfg['username'];
-            $mail->Password = $mCfg['password'];
-            $mail->SMTPSecure = 'tls';
-            $mail->Port = $mCfg['port'];
-            $mail->setFrom($mCfg['from_email'], $mCfg['from_name']);
-            $mail->addAddress($to);
-            $mail->isHTML(true);
-            $mail->Subject = $subject;
-            $mail->Body = $body;
-            $mail->send();
-        } catch (\Exception $e) {
-            // for student project, we can silently ignore email errors or log them
-            error_log("Mail error: " . $e->getMessage());
-        }
-    }
-
-    protected function verifyRecaptcha($response) {
-        $secret = $this->cfg['recaptcha']['secret_key'] ?? '';
-        if (!$secret) return true; // if not configured, bypass (for testing)
-        $resp = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret}&response={$response}");
-        $json = json_decode($resp, true);
+    protected function verifyRecaptcha($response, $secret)
+    {
+        if (empty($secret)) return true; // bypass in dev
+        $url = 'https://www.google.com/recaptcha/api/siteverify';
+        $data = http_build_query(['secret'=>$secret,'response'=>$response]);
+        $opts = ['http' => ['method' => 'POST', 'header' => 'Content-type: application/x-www-form-urlencoded', 'content' => $data]];
+        $context = stream_context_create($opts);
+        $res = @file_get_contents($url, false, $context);
+        if (!$res) return false;
+        $json = json_decode($res, true);
         return $json['success'] ?? false;
     }
 }

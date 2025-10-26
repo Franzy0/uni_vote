@@ -43,4 +43,18 @@ defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 |
 */
 
-$router->get('/', 'Welcome::index');
+$router->get('/', 'VoteController::index');
+$router->match('/vote', 'VoteController::vote', ['GET','POST']);
+$router->get('/vote/success', 'VoteController::success');
+
+// Auth
+$router->match('/auth/login', 'AuthController::login', ['GET','POST']);
+$router->match('/auth/register', 'AuthController::register', ['GET','POST']);
+$router->get('/auth/logout', 'AuthController::logout');
+
+// Admin
+$router->get('/admin', 'AdminController::dashboard');
+$router->match('/admin/candidates', 'AdminController::manage_candidates', ['GET','POST']);
+$router->post('/admin/candidates/delete', 'AdminController::delete_candidate');
+$router->get('/admin/results', 'AdminController::results');
+$router->get('/admin/results/export', 'AdminController::export_results');

@@ -79,7 +79,7 @@ $config['ENVIRONMENT']             = 'development';
 | WARNING: You MUST set this value!
 |
 */
-$config['base_url'] 				= '';
+$config['base_url'] 				= 'http://localhost/online-voting/';
 
 /*
 |--------------------------------------------------------------------------
@@ -180,7 +180,7 @@ $config['error_view_path']         	= '';
 | $config['404_override'] is use if you want to add custom 404 error page.
 |
 |	example: $confg['404_override'] = 'default/404'
-|
+|/////////
 |	if you have 'default folder' and '404.php file' inside error folder in view
 |
 */
@@ -301,6 +301,22 @@ $config['soft_delete_column']       = 'deleted_at';
 | 'csrf_cookie_name' = The cookie name
 | 'csrf_expire' = The number in seconds the token should expire.
 */
+$config['mail'] = [
+    'host' => 'smtp.example.com',
+    'username' => 'no-reply@example.com',
+    'password' => 'smtp-password',
+    'port' => 587,
+    'from_email' => 'no-reply@example.com',
+    'from_name' => 'University Voting'
+];
+
+// reCAPTCHA v2 keys (get from Google)
+$config['recaptcha'] = [
+    'site_key' => '',
+    'secret_key' => ''
+];
+
+
 $config['csrf_protection']         = FALSE;
 $config['csrf_exclude_uris']       = array();
 $config['csrf_token_name']         = 'csrf_test_name';

@@ -1,18 +1,14 @@
 <?php
-// app/models/AdminModel.php
-namespace App\Models;
-use App\Core\Database;
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 
-class AdminModel {
-    protected $db;
-    public function __construct() { $this->db = Database::getConnection(); }
+class AdminModel extends Model
+{
+    protected $table = 'admins';
 
-    public function authenticate($username, $password) {
-        $stmt = $this->db->prepare("SELECT * FROM admins WHERE username = ?");
-        $stmt->execute([$username]);
-        $a = $stmt->fetch();
-        if ($a && password_verify($password, $a['password'])) return $a;
+    public function authenticate($username, $password)
+    {
+        $row = $this->db->table($this->table)->where('username', $username)->get()->row_array();
+        if ($row && password_verify($password, $row['password'])) return $row;
         return false;
     }
 }
